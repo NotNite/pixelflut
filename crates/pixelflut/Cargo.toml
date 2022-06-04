@@ -1,0 +1,9 @@
+[package]
+name = "pixelflut"
+
+authors = ["NotNite", "Philpax"]
+description = "A synchronous library for connecting to Pixelflut"
+edition = "2021"
+version = "0.1.0"
+
+[dependencies]
