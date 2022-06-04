@@ -1,5 +1,4 @@
-use std::error::Error;
-
+use anyhow::Context;
 use clap::{ArgEnum, Parser};
 use image::imageops::FilterType;
 use image::{GenericImageView, Pixel};
@@ -60,10 +59,10 @@ struct Args {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
-    let img = image::open(&args.image_path).expect("Couldn't load image file");
+    let img = image::open(&args.image_path).context("Couldn't load image file")?;
 
     if args.w.is_some() && args.h.is_some() {
         img.resize(args.w.unwrap(), args.h.unwrap(), FilterType::Triangle);
@@ -98,7 +97,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .collect();
         pixels.shuffle(&mut rand::thread_rng());
 
-        let mut stream = TcpStream::connect(HOST).await.expect("Could not connect");
+        let mut stream = TcpStream::connect(HOST)
+            .await
+            .context("Could not connect")?;
 
         let handle = tokio::task::spawn(async move {
             loop {
