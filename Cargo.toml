@@ -1,15 +1,2 @@
-[package]
-name = "pixelflut"
-authors = ["NotNite"]
-description = "A pixelflut client in Rust"
-version = "0.1.0"
-edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-clap = { version = "3.1.18", features = ["derive"] }
-image = "0.24.2"
-rand = "0.8.5"
-futures = "0.3.21"
-rayon = "1.5.3"
+[workspace]
+members = ["apps/*", "crates/*"]
