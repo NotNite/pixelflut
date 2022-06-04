@@ -1,6 +1,9 @@
 use clap::{ArgEnum, Parser};
 use image::{imageops::FilterType, GenericImageView, Pixel};
-use std::{io::Write, net::TcpStream};
+use std::{
+    io::{self, Write},
+    net::TcpStream,
+};
 
 // TODO: don't hardcode this lmao
 const HOST: &str = "lmaobox.n2.pm:33333";
@@ -53,6 +56,23 @@ struct Args {
     threads: u32,
 }
 
+pub struct Pixelflut {
+    stream: TcpStream,
+}
+
+impl Pixelflut {
+    pub fn new(host: &str) -> io::Result<Pixelflut> {
+        let stream = TcpStream::connect(host)?;
+        Ok(Self { stream })
+    }
+
+    pub fn write(&mut self, x: u32, y: u32, color: (u8, u8, u8)) -> io::Result<()> {
+        let hex = format!("{:02x}{:02x}{:02x}", color.0, color.1, color.2);
+        let command = format!("PX {} {} {}\n", x, y, hex);
+        self.stream.write_all(command.as_bytes())
+    }
+}
+
 fn main() {
     let args = Args::parse();
 
@@ -88,16 +108,13 @@ fn main() {
             let new_img = img.crop_imm(0, height_offset, image_width, height);
 
             std::thread::spawn(move || loop {
-                let mut stream = TcpStream::connect(HOST).expect("Could not connect");
+                let mut pixelflut = Pixelflut::new(HOST).expect("failed to connect to pixelflut");
                 for (px, py, color) in new_img.pixels() {
-                    let channels = color.channels();
+                    let col = color.channels();
 
-                    let hex = format!("{:02x}{:02x}{:02x}", channels[0], channels[1], channels[2]);
-                    let command = format!("PX {} {} {}\n", x + px, y + height_offset + py, hex);
-
-                    stream
-                        .write_all(command.as_bytes())
-                        .expect("Failed to write to stream");
+                    pixelflut
+                        .write(x + px, y + height_offset + py, (col[0], col[1], col[2]))
+                        .expect("failed to write to pixelflut");
                 }
             })
         })
