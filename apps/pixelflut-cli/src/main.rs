@@ -126,7 +126,8 @@ async fn main() {
                             .expect("failed to write to pixelflut");
                     }
 
-                    tokio::time::sleep(tokio::time::Duration::from_millis(args.sleep_time as u64)).await;
+                    tokio::time::sleep(tokio::time::Duration::from_millis(args.sleep_time as u64))
+                        .await;
                 }
             })
         });
