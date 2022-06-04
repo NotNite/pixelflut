@@ -49,6 +49,10 @@ struct Args {
     /// Number of threads
     #[clap(short, long, default_value_t = 1)]
     threads: u32,
+
+    /// Sleep time on each thread in milliseconds, as not to hammer the CPU
+    #[clap(short, long, default_value_t = 100)]
+    sleep_time: u32,
 }
 
 fn calculate_position(
@@ -94,18 +98,23 @@ fn main() {
         .map(|idx| {
             let height = img.height() / args.threads;
             let height_offset = idx * height;
+
             let new_img = img.crop_imm(0, height_offset, img.width(), height);
             let host = args.host.clone();
-
-            std::thread::spawn(move || loop {
+            std::thread::spawn(move || {
                 let mut pixelflut =
                     Pixelflut::connect(&host).expect("failed to connect to pixelflut on thread");
-                for (px, py, color) in new_img.pixels() {
-                    let col = color.channels();
 
-                    pixelflut
-                        .write(x + px, y + height_offset + py, (col[0], col[1], col[2]))
-                        .expect("failed to write to pixelflut");
+                loop {
+                    for (px, py, color) in new_img.pixels() {
+                        let col = color.channels();
+
+                        pixelflut
+                            .write(x + px, y + height_offset + py, (col[0], col[1], col[2]))
+                            .expect("failed to write to pixelflut");
+                    }
+
+                    std::thread::sleep(std::time::Duration::from_millis(args.sleep_time as u64));
                 }
             })
         })
