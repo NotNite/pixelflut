@@ -1,7 +1,7 @@
 use clap::{ArgEnum, Parser};
 use image::{imageops::FilterType, GenericImageView, Pixel};
-use rand::prelude::SliceRandom;
 use pixelflut::Pixelflut;
+use rand::prelude::SliceRandom;
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ArgEnum, Debug)]
 enum ImagePosition {
@@ -95,28 +95,28 @@ fn main() {
         None => (args.x, args.y),
     };
 
-    let handles: Vec<_> = (0..args.threads)
-        .map(|idx| {
-            let height = img.height() / args.threads;
-            let height_offset = idx * height;
+    let mut pixels: Vec<_> = img
+        .pixels()
+        .filter(|(_, _, col)| col.channels()[3] == 255)
+        .collect();
+    pixels.shuffle(&mut rand::thread_rng());
 
-            let new_img = img.crop_imm(0, height_offset, img.width(), height);
+    let handles: Vec<_> = pixels
+        .chunks(pixels.len() / (args.threads as usize))
+        .map(|pixels| {
             let host = args.host.clone();
+            let pixels = pixels.to_vec();
+
             std::thread::spawn(move || {
                 let mut pixelflut =
                     Pixelflut::connect(&host).expect("failed to connect to pixelflut on thread");
-                let mut pixels: Vec<_> = new_img
-                    .pixels()
-                    .filter(|(_, _, col)| col.channels()[3] == 255)
-                    .collect();
-                pixels.shuffle(&mut rand::thread_rng());
 
                 loop {
                     for (px, py, color) in &pixels {
                         let col = color.channels();
 
                         pixelflut
-                            .write(x + px, y + height_offset + py, (col[0], col[1], col[2]))
+                            .write(x + *px, y + *py, (col[0], col[1], col[2]))
                             .expect("failed to write to pixelflut");
                     }
 
