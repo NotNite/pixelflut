@@ -73,19 +73,8 @@ impl Pixelflut {
     }
 }
 
-fn main() {
-    let args = Args::parse();
-
-    let img = image::open(&args.image_path).expect("Couldn't load image file");
-
-    if let (Some(w), Some(h)) = (args.w, args.h) {
-        img.resize(w, h, FilterType::Triangle);
-    }
-
-    let image_width = img.width();
-    let image_height = img.height();
-
-    let (x, y) = match args.position {
+fn calculate_position(image_width: u32, image_height: u32, args: &Args) -> (u32, u32) {
+    match args.position {
         Some(ImagePosition::TopLeft) => (0, 0),
         Some(ImagePosition::TopMiddle) => ((WIDTH - image_width) / 2, 0),
         Some(ImagePosition::TopRight) => (WIDTH - image_width, 0),
@@ -99,13 +88,24 @@ fn main() {
         Some(ImagePosition::BottomRight) => (WIDTH - image_width, HEIGHT - image_height),
 
         _ => (args.x, args.y),
-    };
+    }
+}
+
+fn main() {
+    let args = Args::parse();
+
+    let img = image::open(&args.image_path).expect("Couldn't load image file");
+    if let (Some(w), Some(h)) = (args.w, args.h) {
+        img.resize(w, h, FilterType::Triangle);
+    }
+
+    let (x, y) = calculate_position(img.width(), img.height(), &args);
 
     let handles: Vec<_> = (0..args.threads)
         .map(|idx| {
-            let height = image_height / args.threads;
+            let height = img.height() / args.threads;
             let height_offset = idx * height;
-            let new_img = img.crop_imm(0, height_offset, image_width, height);
+            let new_img = img.crop_imm(0, height_offset, img.width(), height);
 
             std::thread::spawn(move || loop {
                 let mut pixelflut = Pixelflut::new(HOST).expect("failed to connect to pixelflut");
