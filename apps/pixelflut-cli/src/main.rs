@@ -47,13 +47,9 @@ struct Args {
     #[clap(short, long, arg_enum, alias = "pos")]
     position: Option<ImagePosition>,
 
-    /// Number of threads
+    /// Number of tasks
     #[clap(short, long, default_value_t = 1)]
-    threads: u32,
-
-    /// Sleep time on each thread in milliseconds, as not to hammer the CPU
-    #[clap(short, long, default_value_t = 100)]
-    sleep_time: u32,
+    tasks: u32,
 }
 
 fn calculate_position(
@@ -78,12 +74,16 @@ fn calculate_position(
     }
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args = Args::parse();
 
     let (width, height) = Pixelflut::connect(&args.host)
-        .and_then(|mut pf| pf.size())
-        .expect("failed to connect to pixelflut to get size");
+        .await
+        .expect("failed to connect to pixelflut")
+        .size()
+        .await
+        .expect("failed to get pixelflut size");
 
     let img = image::open(&args.image_path).expect("Couldn't load image file");
     if let (Some(w), Some(h)) = (args.w, args.h) {
@@ -101,15 +101,16 @@ fn main() {
         .collect();
     pixels.shuffle(&mut rand::thread_rng());
 
-    let handles: Vec<_> = pixels
-        .chunks(pixels.len() / (args.threads as usize))
+    let handles = pixels
+        .chunks(pixels.len() / (args.tasks as usize))
         .map(|pixels| {
             let host = args.host.clone();
             let pixels = pixels.to_vec();
 
-            std::thread::spawn(move || {
-                let mut pixelflut =
-                    Pixelflut::connect(&host).expect("failed to connect to pixelflut on thread");
+            tokio::spawn(async move {
+                let mut pixelflut = Pixelflut::connect(&host)
+                    .await
+                    .expect("failed to connect to pixelflut on task");
 
                 loop {
                     for (px, py, color) in &pixels {
@@ -117,17 +118,13 @@ fn main() {
 
                         pixelflut
                             .write(x + *px, y + *py, (col[0], col[1], col[2]))
+                            .await
                             .expect("failed to write to pixelflut");
                     }
-
-                    std::thread::sleep(std::time::Duration::from_millis(args.sleep_time as u64));
                 }
             })
-        })
-        .collect();
+        });
 
     println!("Running, C-c to stop...");
-    for handle in handles {
-        handle.join().unwrap();
-    }
+    futures::future::join_all(handles).await;
 }
