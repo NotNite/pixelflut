@@ -50,6 +50,10 @@ struct Args {
     /// Number of tasks
     #[clap(short, long, default_value_t = 1)]
     tasks: u32,
+
+    /// Sleep time on each task in milliseconds to not hammer the network
+    #[clap(short, long, default_value_t = 100)]
+    sleep_time: u32,
 }
 
 fn calculate_position(
@@ -121,6 +125,8 @@ async fn main() {
                             .await
                             .expect("failed to write to pixelflut");
                     }
+
+                    tokio::time::sleep(tokio::time::Duration::from_millis(args.sleep_time as u64)).await;
                 }
             })
         });
