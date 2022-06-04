@@ -1,11 +1,7 @@
-use anyhow::Context;
 use clap::{ArgEnum, Parser};
-use image::imageops::FilterType;
-use image::{GenericImageView, Pixel};
+use image::{imageops::FilterType, GenericImageView, Pixel};
 use rand::prelude::SliceRandom;
-
-use tokio::io::AsyncWriteExt;
-use tokio::net::TcpStream;
+use std::{io::Write, net::TcpStream};
 
 // TODO: don't hardcode this lmao
 const HOST: &str = "lmaobox.n2.pm:33333";
@@ -58,11 +54,10 @@ struct Args {
     threads: u8,
 }
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
+fn main() {
     let args = Args::parse();
 
-    let img = image::open(&args.image_path).context("Couldn't load image file")?;
+    let img = image::open(&args.image_path).expect("Couldn't load image file");
 
     if let (Some(w), Some(h)) = (args.w, args.h) {
         img.resize(w, h, FilterType::Triangle);
@@ -87,22 +82,18 @@ async fn main() -> anyhow::Result<()> {
         _ => (args.x, args.y),
     };
 
-    let mut handles = vec![];
+    let stream = TcpStream::connect(HOST).expect("Could not connect");
+    let handles: Vec<_> = (0..args.threads)
+        .map(|_| {
+            // shamelessly stolen from anna
+            let mut pixels: Vec<_> = img
+                .pixels()
+                .filter(|(_, _, col)| col.channels()[3] == 255)
+                .collect();
+            pixels.shuffle(&mut rand::thread_rng());
 
-    for _ in 0..args.threads {
-        // shamelessly stolen from anna
-        let mut pixels: Vec<_> = img
-            .pixels()
-            .filter(|(_, _, col)| col.channels()[3] == 255)
-            .collect();
-        pixels.shuffle(&mut rand::thread_rng());
-
-        let mut stream = TcpStream::connect(HOST)
-            .await
-            .context("Could not connect")?;
-
-        let handle = tokio::task::spawn(async move {
-            loop {
+            let mut stream = stream.try_clone().expect("failed to clone stream");
+            std::thread::spawn(move || loop {
                 for (px, py, color) in &pixels {
                     let channels = color.channels();
 
@@ -111,17 +102,14 @@ async fn main() -> anyhow::Result<()> {
 
                     stream
                         .write_all(command.as_bytes())
-                        .await
                         .expect("Failed to write to stream");
                 }
-            }
-        });
-
-        handles.push(handle);
-    }
+            })
+        })
+        .collect();
 
     println!("Running, C-c to stop...");
-    futures::future::join_all(handles).await;
-
-    Ok(())
+    for handle in handles {
+        handle.join().unwrap();
+    }
 }
