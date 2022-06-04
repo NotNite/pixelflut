@@ -75,8 +75,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mut x: u32 = args.x;
     let mut y: u32 = args.y;
 
-    if args.position.is_some() {
-        (x, y) = match args.position.unwrap() {
+    if let Some(pos) = args.position {
+        (x, y) = match pos {
             ImagePosition::TopLeft => (0, 0),
             ImagePosition::TopMiddle => ((WIDTH - image_width) / 2, 0),
             ImagePosition::TopRight => (WIDTH - image_width, 0),
