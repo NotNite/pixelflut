@@ -1,5 +1,6 @@
 use clap::{ArgEnum, Parser};
 use image::{imageops::FilterType, GenericImageView, Pixel};
+use rand::prelude::SliceRandom;
 use pixelflut::Pixelflut;
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ArgEnum, Debug)]
@@ -104,9 +105,14 @@ fn main() {
             std::thread::spawn(move || {
                 let mut pixelflut =
                     Pixelflut::connect(&host).expect("failed to connect to pixelflut on thread");
+                let mut pixels: Vec<_> = new_img
+                    .pixels()
+                    .filter(|(_, _, col)| col.channels()[3] == 255)
+                    .collect();
+                pixels.shuffle(&mut rand::thread_rng());
 
                 loop {
-                    for (px, py, color) in new_img.pixels() {
+                    for (px, py, color) in &pixels {
                         let col = color.channels();
 
                         pixelflut
