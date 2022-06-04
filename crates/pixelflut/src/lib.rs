@@ -1,27 +1,28 @@
-use std::io::{self, BufRead, Write};
-
-use std::net::TcpStream;
+use tokio::{
+    io::{self, AsyncBufReadExt, AsyncWriteExt},
+    net::{
+        tcp::{OwnedReadHalf, OwnedWriteHalf},
+        TcpStream,
+    },
+};
 
 pub struct Pixelflut {
-    write: TcpStream,
-    read: io::BufReader<TcpStream>,
+    writer: OwnedWriteHalf,
+    reader: io::BufReader<OwnedReadHalf>,
 }
 
 impl Pixelflut {
-    pub fn connect(host: &str) -> io::Result<Pixelflut> {
-        let stream = TcpStream::connect(host)?;
-        let read = io::BufReader::new(stream.try_clone()?);
-        Ok(Self {
-            write: stream,
-            read,
-        })
+    pub async fn connect(host: &str) -> io::Result<Pixelflut> {
+        let (reader, writer) = TcpStream::connect(host).await?.into_split();
+        let reader = io::BufReader::new(reader);
+        Ok(Self { writer, reader })
     }
 
-    pub fn size(&mut self) -> io::Result<(u32, u32)> {
-        writeln!(self.write, "SIZE")?;
+    pub async fn size(&mut self) -> io::Result<(u32, u32)> {
+        self.writer.write_all(b"SIZE\n").await?;
 
         let mut line = String::new();
-        self.read.read_line(&mut line)?;
+        self.reader.read_line(&mut line).await?;
 
         let mut iter = line
             .split_ascii_whitespace()
@@ -30,11 +31,13 @@ impl Pixelflut {
         Ok((iter.next().unwrap(), iter.next().unwrap()))
     }
 
-    pub fn read(&mut self, x: u32, y: u32) -> io::Result<(u8, u8, u8)> {
-        writeln!(self.write, "PX {} {}", x, y)?;
+    pub async fn read(&mut self, x: u32, y: u32) -> io::Result<(u8, u8, u8)> {
+        self.writer
+            .write_all(format!("PX {} {}\n", x, y).as_bytes())
+            .await?;
 
         let mut line = String::new();
-        self.read.read_line(&mut line)?;
+        self.reader.read_line(&mut line).await?;
 
         let colour_string = line
             .split_ascii_whitespace()
@@ -48,8 +51,11 @@ impl Pixelflut {
         ))
     }
 
-    pub fn write(&mut self, x: u32, y: u32, color: (u8, u8, u8)) -> io::Result<()> {
+    pub async fn write(&mut self, x: u32, y: u32, color: (u8, u8, u8)) -> io::Result<()> {
         let hex = format!("{:02x}{:02x}{:02x}", color.0, color.1, color.2);
-        writeln!(self.write, "PX {} {} {}", x, y, hex)
+        self.writer
+            .write_all(format!("PX {} {} {}\n", x, y, hex).as_bytes())
+            .await?;
+        Ok(())
     }
 }
