@@ -1,14 +1,12 @@
 use clap::{ArgEnum, Parser};
 use image::{imageops::FilterType, GenericImageView, Pixel};
 use std::{
-    io::{self, Write},
+    io::{self, BufRead, Write},
     net::TcpStream,
 };
 
 // TODO: don't hardcode this lmao
 const HOST: &str = "lmaobox.n2.pm:33333";
-const WIDTH: u32 = 1280;
-const HEIGHT: u32 = 720;
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ArgEnum, Debug)]
 enum ImagePosition {
@@ -57,19 +55,36 @@ struct Args {
 }
 
 pub struct Pixelflut {
-    stream: TcpStream,
+    write: TcpStream,
+    read: io::BufReader<TcpStream>,
 }
 
 impl Pixelflut {
-    pub fn new(host: &str) -> io::Result<Pixelflut> {
+    pub fn connect(host: &str) -> io::Result<Pixelflut> {
         let stream = TcpStream::connect(host)?;
-        Ok(Self { stream })
+        let read = io::BufReader::new(stream.try_clone()?);
+        Ok(Self {
+            write: stream,
+            read,
+        })
+    }
+
+    pub fn size(&mut self) -> io::Result<(u32, u32)> {
+        writeln!(self.write, "SIZE")?;
+
+        let mut line = String::new();
+        self.read.read_line(&mut line)?;
+
+        let mut iter = line
+            .split_ascii_whitespace()
+            .skip(1)
+            .map(|v| v.parse::<u32>().expect("expected integer for size"));
+        Ok((iter.next().unwrap(), iter.next().unwrap()))
     }
 
     pub fn write(&mut self, x: u32, y: u32, color: (u8, u8, u8)) -> io::Result<()> {
         let hex = format!("{:02x}{:02x}{:02x}", color.0, color.1, color.2);
-        let command = format!("PX {} {} {}\n", x, y, hex);
-        self.stream.write_all(command.as_bytes())
+        writeln!(self.write, "PX {} {} {}", x, y, hex)
     }
 }
 
@@ -98,6 +113,11 @@ fn calculate_position(
 fn main() {
     let args = Args::parse();
 
+    let host = HOST;
+    let (width, height) = Pixelflut::connect(host)
+        .and_then(|mut pf| pf.size())
+        .expect("failed to connect to pixelflut to get size");
+
     let img = image::open(&args.image_path).expect("Couldn't load image file");
     if let (Some(w), Some(h)) = (args.w, args.h) {
         img.resize(w, h, FilterType::Triangle);
@@ -115,7 +135,8 @@ fn main() {
             let new_img = img.crop_imm(0, height_offset, img.width(), height);
 
             std::thread::spawn(move || loop {
-                let mut pixelflut = Pixelflut::new(HOST).expect("failed to connect to pixelflut");
+                let mut pixelflut =
+                    Pixelflut::connect(host).expect("failed to connect to pixelflut on thread");
                 for (px, py, color) in new_img.pixels() {
                     let col = color.channels();
 
