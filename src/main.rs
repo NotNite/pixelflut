@@ -73,21 +73,25 @@ impl Pixelflut {
     }
 }
 
-fn calculate_position(image_width: u32, image_height: u32, args: &Args) -> (u32, u32) {
-    match args.position {
-        Some(ImagePosition::TopLeft) => (0, 0),
-        Some(ImagePosition::TopMiddle) => ((WIDTH - image_width) / 2, 0),
-        Some(ImagePosition::TopRight) => (WIDTH - image_width, 0),
+fn calculate_position(
+    pf_width: u32,
+    pf_height: u32,
+    image_width: u32,
+    image_height: u32,
+    position: &ImagePosition,
+) -> (u32, u32) {
+    match position {
+        ImagePosition::TopLeft => (0, 0),
+        ImagePosition::TopMiddle => ((pf_width - image_width) / 2, 0),
+        ImagePosition::TopRight => (pf_width - image_width, 0),
 
-        Some(ImagePosition::MiddleLeft) => (0, (HEIGHT - image_height) / 2),
-        Some(ImagePosition::Middle) => ((WIDTH - image_width) / 2, (HEIGHT - image_height) / 2),
-        Some(ImagePosition::MiddleRight) => (WIDTH - image_width, (HEIGHT - image_height) / 2),
+        ImagePosition::MiddleLeft => (0, (pf_height - image_height) / 2),
+        ImagePosition::Middle => ((pf_width - image_width) / 2, (pf_height - image_height) / 2),
+        ImagePosition::MiddleRight => (pf_width - image_width, (pf_height - image_height) / 2),
 
-        Some(ImagePosition::BottomLeft) => (0, HEIGHT - image_height),
-        Some(ImagePosition::BottomMiddle) => ((WIDTH - image_width) / 2, HEIGHT - image_height),
-        Some(ImagePosition::BottomRight) => (WIDTH - image_width, HEIGHT - image_height),
-
-        _ => (args.x, args.y),
+        ImagePosition::BottomLeft => (0, pf_height - image_height),
+        ImagePosition::BottomMiddle => ((pf_width - image_width) / 2, pf_height - image_height),
+        ImagePosition::BottomRight => (pf_width - image_width, pf_height - image_height),
     }
 }
 
@@ -99,7 +103,10 @@ fn main() {
         img.resize(w, h, FilterType::Triangle);
     }
 
-    let (x, y) = calculate_position(img.width(), img.height(), &args);
+    let (x, y) = match args.position {
+        Some(position) => calculate_position(width, height, img.width(), img.height(), &position),
+        None => (args.x, args.y),
+    };
 
     let handles: Vec<_> = (0..args.threads)
         .map(|idx| {
