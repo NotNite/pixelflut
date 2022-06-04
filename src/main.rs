@@ -5,9 +5,6 @@ use std::{
     net::TcpStream,
 };
 
-// TODO: don't hardcode this lmao
-const HOST: &str = "lmaobox.n2.pm:33333";
-
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ArgEnum, Debug)]
 enum ImagePosition {
     TopLeft,
@@ -26,6 +23,9 @@ enum ImagePosition {
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
+    /// Host to connect to
+    host: String,
+
     /// Path to the image file
     image_path: String,
 
@@ -113,8 +113,7 @@ fn calculate_position(
 fn main() {
     let args = Args::parse();
 
-    let host = HOST;
-    let (width, height) = Pixelflut::connect(host)
+    let (width, height) = Pixelflut::connect(&args.host)
         .and_then(|mut pf| pf.size())
         .expect("failed to connect to pixelflut to get size");
 
@@ -133,10 +132,11 @@ fn main() {
             let height = img.height() / args.threads;
             let height_offset = idx * height;
             let new_img = img.crop_imm(0, height_offset, img.width(), height);
+            let host = args.host.clone();
 
             std::thread::spawn(move || loop {
                 let mut pixelflut =
-                    Pixelflut::connect(host).expect("failed to connect to pixelflut on thread");
+                    Pixelflut::connect(&host).expect("failed to connect to pixelflut on thread");
                 for (px, py, color) in new_img.pixels() {
                     let col = color.channels();
 
