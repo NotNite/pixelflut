@@ -1,6 +1,5 @@
 use clap::{ArgEnum, Parser};
 use image::{imageops::FilterType, GenericImageView, Pixel};
-use rand::prelude::SliceRandom;
 use std::{io::Write, net::TcpStream};
 
 // TODO: don't hardcode this lmao
@@ -51,7 +50,7 @@ struct Args {
 
     /// Number of threads
     #[clap(short, long, default_value_t = 1)]
-    threads: u8,
+    threads: u32,
 }
 
 fn main() {
@@ -82,23 +81,19 @@ fn main() {
         _ => (args.x, args.y),
     };
 
-    let stream = TcpStream::connect(HOST).expect("Could not connect");
     let handles: Vec<_> = (0..args.threads)
-        .map(|_| {
-            // shamelessly stolen from anna
-            let mut pixels: Vec<_> = img
-                .pixels()
-                .filter(|(_, _, col)| col.channels()[3] == 255)
-                .collect();
-            pixels.shuffle(&mut rand::thread_rng());
+        .map(|idx| {
+            let height = image_height / args.threads;
+            let height_offset = idx * height;
+            let new_img = img.crop_imm(0, height_offset, image_width, height);
 
-            let mut stream = stream.try_clone().expect("failed to clone stream");
             std::thread::spawn(move || loop {
-                for (px, py, color) in &pixels {
+                let mut stream = TcpStream::connect(HOST).expect("Could not connect");
+                for (px, py, color) in new_img.pixels() {
                     let channels = color.channels();
 
                     let hex = format!("{:02x}{:02x}{:02x}", channels[0], channels[1], channels[2]);
-                    let command = format!("PX {} {} {}\n", x + px, y + py, hex);
+                    let command = format!("PX {} {} {}\n", x + px, y + height_offset + py, hex);
 
                     stream
                         .write_all(command.as_bytes())
