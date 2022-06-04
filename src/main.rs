@@ -72,24 +72,21 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let image_width = img.width();
     let image_height = img.height();
 
-    let mut x: u32 = args.x;
-    let mut y: u32 = args.y;
+    let (x, y) = match args.position {
+        Some(ImagePosition::TopLeft) => (0, 0),
+        Some(ImagePosition::TopMiddle) => ((WIDTH - image_width) / 2, 0),
+        Some(ImagePosition::TopRight) => (WIDTH - image_width, 0),
 
-    if let Some(pos) = args.position {
-        (x, y) = match pos {
-            ImagePosition::TopLeft => (0, 0),
-            ImagePosition::TopMiddle => ((WIDTH - image_width) / 2, 0),
-            ImagePosition::TopRight => (WIDTH - image_width, 0),
+        Some(ImagePosition::MiddleLeft) => (0, (HEIGHT - image_height) / 2),
+        Some(ImagePosition::Middle) => ((WIDTH - image_width) / 2, (HEIGHT - image_height) / 2),
+        Some(ImagePosition::MiddleRight) => (WIDTH - image_width, (HEIGHT - image_height) / 2),
 
-            ImagePosition::MiddleLeft => (0, (HEIGHT - image_height) / 2),
-            ImagePosition::Middle => ((WIDTH - image_width) / 2, (HEIGHT - image_height) / 2),
-            ImagePosition::MiddleRight => (WIDTH - image_width, (HEIGHT - image_height) / 2),
+        Some(ImagePosition::BottomLeft) => (0, HEIGHT - image_height),
+        Some(ImagePosition::BottomMiddle) => ((WIDTH - image_width) / 2, HEIGHT - image_height),
+        Some(ImagePosition::BottomRight) => (WIDTH - image_width, HEIGHT - image_height),
 
-            ImagePosition::BottomLeft => (0, HEIGHT - image_height),
-            ImagePosition::BottomMiddle => ((WIDTH - image_width) / 2, HEIGHT - image_height),
-            ImagePosition::BottomRight => (WIDTH - image_width, HEIGHT - image_height),
-        };
-    }
+        _ => (args.x, args.y),
+    };
 
     let mut handles = vec![];
 
