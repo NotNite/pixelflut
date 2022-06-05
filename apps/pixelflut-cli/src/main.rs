@@ -125,7 +125,7 @@ async fn main() {
                             .await;
 
                         if res.is_err() {
-                            println!("Error while writing to Pixelflut - reconnecting: {:?}", res);
+                            eprintln!("Error while writing to Pixelflut - reconnecting: {:?}", res);
 
                             pixelflut = Pixelflut::connect(&host)
                                 .await
