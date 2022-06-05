@@ -89,7 +89,7 @@ async fn main() {
         .await
         .expect("failed to get pixelflut size");
 
-    let img = image::open(&args.image_path).expect("Couldn't load image file");
+    let img = image::open(&args.image_path).expect("couldn't load image file");
     if let (Some(w), Some(h)) = (args.w, args.h) {
         img.resize(w, h, FilterType::Triangle);
     }
@@ -120,10 +120,19 @@ async fn main() {
                     for (px, py, color) in &pixels {
                         let col = color.channels();
 
-                        pixelflut
+                        let res = pixelflut
                             .write(x + *px, y + *py, (col[0], col[1], col[2]))
-                            .await
-                            .expect("failed to write to pixelflut");
+                            .await;
+
+                        if res.is_err() {
+                            println!("Error while writing to Pixelflut - reconnecting: {:?}", res);
+
+                            pixelflut = Pixelflut::connect(&host)
+                                .await
+                                .expect("failed to reconnect to pixelflut");
+
+                            break;
+                        }
                     }
 
                     tokio::time::sleep(tokio::time::Duration::from_millis(args.sleep_time as u64))
