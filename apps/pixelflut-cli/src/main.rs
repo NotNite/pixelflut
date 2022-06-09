@@ -54,6 +54,10 @@ struct Args {
     /// Sleep time on each task in milliseconds to not hammer the network
     #[clap(short, long, default_value_t = 100)]
     sleep_time: u32,
+
+    /// Use nearest neighbor when resizing image
+    #[clap(short, long)]
+    nearest: bool,
 }
 
 fn calculate_position(
@@ -91,7 +95,13 @@ async fn main() {
 
     let mut img = image::open(&args.image_path).expect("couldn't load image file");
     if let (Some(w), Some(h)) = (args.w, args.h) {
-        img = img.resize(w, h, FilterType::Triangle);
+        let filter = if args.nearest {
+            FilterType::Nearest
+        } else {
+            FilterType::Triangle
+        };
+
+        img = img.resize_exact(w, h, filter);
     }
 
     let (x, y) = match args.position {
