@@ -89,9 +89,9 @@ async fn main() {
         .await
         .expect("failed to get pixelflut size");
 
-    let img = image::open(&args.image_path).expect("couldn't load image file");
+    let mut img = image::open(&args.image_path).expect("couldn't load image file");
     if let (Some(w), Some(h)) = (args.w, args.h) {
-        img.resize(w, h, FilterType::Triangle);
+        img = img.resize(w, h, FilterType::Triangle);
     }
 
     let (x, y) = match args.position {
